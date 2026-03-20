@@ -1,0 +1,18 @@
+:root {
+  --primary-theme: #1c3d5a;
+  --white: #FFFFFF;
+  --background-site: #f8fafc;
+}
+
+body {
+  margin: 0;
+  padding: 0;
+  display: block;
+  min-width: unset;
+  min-height: unset;
+  background-color: var(--background-site);
+}
+
+#root {
+  width: 100%;
+}

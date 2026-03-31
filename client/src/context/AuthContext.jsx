@@ -28,6 +28,19 @@ export const AuthProvider = ({ children }) => {
       return false;
     } catch (err) {
       console.error('Login error:', err);
+      if (err.response) {
+        // The server responded with a status code outside the 2xx range
+        if (err.response.status === 401) {
+          toast.error('Invalid username or password');
+        } else {
+          toast.error(`Server Error: ${err.response.data.message || 'Unknown error'}`);
+        }
+      } else if (err.request) {
+        // The request was made but no response was received
+        toast.error('Network Error: Cannot reach the server. Please check your internet or API URL.');
+      } else {
+        toast.error('Application Error: Something went wrong.');
+      }
       return false;
     }
   };

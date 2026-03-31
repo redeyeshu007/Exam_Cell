@@ -16,8 +16,6 @@ const Login = () => {
     if (success) {
       toast.success('Welcome Back, Administrator!');
       navigate('/');
-    } else {
-      toast.error('Invalid credentials. Please try again.');
     }
   };
 

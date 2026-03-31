@@ -66,7 +66,13 @@ const getModel = (req) => {
 };
 
 app.get('/', (req, res) => {
-  res.send('Exam Cell API Server is Running');
+  const dbStatus = mongoose.connection.readyState === 1 ? '✅ Connected' : '❌ Disconnected';
+  res.send(`
+    <h1>Exam Cell API Server is Running</h1>
+    <p>Database Status: <b>${dbStatus}</b></p>
+    <hr>
+    <p><i>Tip for Render deployment: Make sure you have set the <b>MONGO_URI</b> environment variable in your Render dashboard.</i></p>
+  `);
 });
 
 // Authentication Routes

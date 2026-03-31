@@ -265,8 +265,28 @@ app.get('/api/stats', async (req, res) => {
   }
 });
 
+const ensureAdminUser = async () => {
+  if (mongoose.connection.readyState !== 1) return;
+  try {
+    const adminPassword = process.env.ADMIN_PASSWORD || 'psna123';
+    const hashedPassword = await bcrypt.hash(adminPassword, 10);
+    const admin = await User.findOne({ username: 'admin' });
+    if (admin) {
+      admin.password = hashedPassword;
+      await admin.save();
+      console.log('✅ Admin user password synced');
+    } else {
+      await User.create({ username: 'admin', password: hashedPassword, role: 'admin' });
+      console.log('✅ Admin user created');
+    }
+  } catch (err) {
+    console.error('❌ Admin seed error:', err.message);
+  }
+};
+
 const start = async () => {
   await connectDB();
+  await ensureAdminUser();
   const PORT = process.env.PORT || 5000;
   app.listen(PORT, '0.0.0.0', () => console.log(`🚀 Server running on port ${PORT} (Listening on 0.0.0.0)`));
 };

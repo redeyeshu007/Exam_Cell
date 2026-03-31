@@ -24,7 +24,7 @@ app.use(cors({
   origin: process.env.CLIENT_URL || true, // Trust CLIENT_URL or all origins in dev
   credentials: true,
   methods: ['GET', 'POST', 'PUT', 'DELETE'],
-  allowedHeaders: ['Content-Type', 'Authorization', 'x-dept-name']
+  allowedHeaders: ['Content-Type', 'Authorization', 'x-dept-name', 'Bypass-Tunnel-Reminder']
 }));
 
 app.use(express.json());

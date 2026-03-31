@@ -2,10 +2,13 @@ const express = require('express');
 const mongoose = require('mongoose');
 const cors = require('cors');
 const helmet = require('helmet');
+const bcrypt = require('bcryptjs');
+const jwt = require('jsonwebtoken');
 require('dotenv').config();
 
 const { getExamModel } = require('./models/Exam');
 const Hall = require('./models/Hall');
+const User = require('./models/User');
 
 const app = express();
 
@@ -66,6 +69,36 @@ app.get('/', (req, res) => {
   res.send('Exam Cell API Server is Running');
 });
 
+// Authentication Routes
+app.post('/api/auth/login', async (req, res) => {
+  try {
+    const { username, password } = req.body;
+    const user = await User.findOne({ username });
+
+    if (!user) {
+      return res.status(401).json({ message: 'Invalid credentials' });
+    }
+
+    const isMatch = await bcrypt.compare(password, user.password);
+    if (!isMatch) {
+      return res.status(401).json({ message: 'Invalid credentials' });
+    }
+
+    // In a full implementation, you'd return a JWT here.
+    // For now, we'll return the user info to match the existing frontend pattern.
+    const userResponse = {
+      id: user._id,
+      username: user.username,
+      role: user.role
+    };
+
+    res.json(userResponse);
+  } catch (err) {
+    console.error('[AUTH ERROR] /api/auth/login:', err);
+    res.status(500).json({ message: 'Server error' });
+  }
+});
+
 // API Routes
 app.get('/api/halls', async (req, res) => {
   try {
@@ -113,8 +146,15 @@ app.post('/api/exams/:id/allocate', async (req, res) => {
       return res.status(400).json({ message: 'All scheduled halls completed' });
     }
 
-    const randomIndex = Math.floor(Math.random() * availableHalls.length);
-    const selectedHallName = availableHalls[randomIndex];
+    // High-entropy Fisher-Yates Shuffle to ensure truly random order
+    const shuffledHalls = [...availableHalls];
+    for (let i = shuffledHalls.length - 1; i > 0; i--) {
+      const j = Math.floor(Math.random() * (i + 1));
+      [shuffledHalls[i], shuffledHalls[j]] = [shuffledHalls[j], shuffledHalls[i]];
+    }
+    
+    // Pick the first one from the shuffled array
+    const selectedHallName = shuffledHalls[0];
 
     // Push as object with empty faculty initially
     exam.allocatedHalls.push({ hall: selectedHallName, faculty: "" });
@@ -212,7 +252,7 @@ app.get('/api/stats', async (req, res) => {
 const start = async () => {
   await connectDB();
   const PORT = process.env.PORT || 5000;
-  app.listen(PORT, () => console.log(`🚀 Server running on port ${PORT}`));
+  app.listen(PORT, '0.0.0.0', () => console.log(`🚀 Server running on port ${PORT} (Listening on 0.0.0.0)`));
 };
 
 start();

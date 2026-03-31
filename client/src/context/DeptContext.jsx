@@ -4,7 +4,7 @@ const DeptContext = createContext();
 
 export const DeptProvider = ({ children }) => {
   const [selectedDept, setSelectedDept] = useState(localStorage.getItem('user_dept') || '');
-  const departments = ['CSE', 'ECE', 'EEE', 'MECH', 'CIVIL', 'AIDS', 'CSBS'];
+  const departments = ['CSE'];
 
   const setDept = (dept) => {
     setSelectedDept(dept);

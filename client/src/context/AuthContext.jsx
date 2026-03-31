@@ -1,4 +1,6 @@
 import { createContext, useContext, useState, useEffect } from 'react';
+import axios from 'axios';
+import API_URL from '../api';
 
 const AuthContext = createContext();
 
@@ -14,14 +16,20 @@ export const AuthProvider = ({ children }) => {
     setLoading(false);
   }, []);
 
-  const login = (username, password) => {
-    if (username === 'admin' && password === 'psna123') {
-      const admin = { username: 'admin', role: 'admin' };
-      setUser(admin);
-      localStorage.setItem('user', JSON.stringify(admin));
-      return true;
+  const login = async (username, password) => {
+    try {
+      const response = await axios.post(`${API_URL}/api/auth/login`, { username, password });
+      if (response.data) {
+        const user = response.data;
+        setUser(user);
+        localStorage.setItem('user', JSON.stringify(user));
+        return true;
+      }
+      return false;
+    } catch (err) {
+      console.error('Login error:', err);
+      return false;
     }
-    return false;
   };
 
   const logout = () => {

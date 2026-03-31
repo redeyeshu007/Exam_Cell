@@ -8,6 +8,9 @@ export default defineConfig({
     react(),
     tailwindcss(),
   ],
+  server: {
+    allowedHosts: true
+  },
   build: {
     sourcemap: false,
     minify: 'terser',

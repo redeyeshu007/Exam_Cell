@@ -3,7 +3,10 @@ import axios from 'axios';
 import { useDept } from '../context/DeptContext';
 import toast from 'react-hot-toast';
 import { motion, AnimatePresence } from 'framer-motion';
-import { LayoutGrid, Trash2, Zap, LayoutPanelLeft, CheckCircle2, AlertCircle } from 'lucide-react';
+import {
+  LayoutGrid, Trash2, LayoutPanelLeft,
+  CheckCircle2, AlertCircle, Search
+} from 'lucide-react';
 import BackButton from '../components/BackButton';
 import API_URL from '../api';
 
@@ -14,8 +17,8 @@ const JoinExam = () => {
   const [allocatedHall, setAllocatedHall] = useState(null);
   const [loading, setLoading] = useState(false);
   const [showConfirm, setShowConfirm] = useState({ show: false, type: '', id: null });
-  const [showFacultyModal, setShowFacultyModal] = useState(false);
   const [facultyName, setFacultyName] = useState('');
+  const [search, setSearch] = useState('');
 
   const fetchExams = async () => {
     try {
@@ -23,7 +26,7 @@ const JoinExam = () => {
         headers: { 'x-dept-name': selectedDept }
       });
       setExams(res.data);
-    } catch (err) {
+    } catch {
       toast.error('Failed to load exams');
     }
   };
@@ -37,13 +40,13 @@ const JoinExam = () => {
       await axios.delete(`${API_URL}/api/exams/${id}`, {
         headers: { 'x-dept-name': selectedDept }
       });
-      toast.success('Exam record removed successfully');
+      toast.success('Exam removed successfully');
       if (selectedExam?._id === id) {
         setSelectedExam(null);
         setAllocatedHall(null);
       }
       fetchExams();
-    } catch (err) {
+    } catch {
       toast.error('Could not delete the record');
     }
   };
@@ -53,432 +56,510 @@ const JoinExam = () => {
     setLoading(true);
     setAllocatedHall(null);
     try {
-      const res = await axios.post(`${API_URL}/api/exams/${selectedExam._id}/allocate`, {}, {
-        headers: { 'x-dept-name': selectedDept }
-      });
+      const res = await axios.post(
+        `${API_URL}/api/exams/${selectedExam._id}/allocate`,
+        {},
+        { headers: { 'x-dept-name': selectedDept } }
+      );
       setAllocatedHall(res.data.hall);
       setSelectedExam(res.data.exam);
       setExams(prev => prev.map(e => e._id === res.data.exam._id ? res.data.exam : e));
-      toast.success(`Hall ${res.data.hall} Assigned!`, {
-        icon: '🎯',
-        style: { borderRadius: '10px', background: '#333', color: '#fff' }
-      });
+      toast.success(`Hall ${res.data.hall.replace(/-\d+$/, '')} assigned!`);
     } catch (err) {
-      toast.error(err.response?.data?.message || 'Allocation process failed');
+      toast.error(err.response?.data?.message || 'Allocation failed');
     } finally {
       setLoading(false);
-      setShowFacultyModal(true); // Open modal after generation
     }
   };
 
   const handleSaveFaculty = async () => {
     if (!selectedExam || !allocatedHall) return;
     try {
-      await axios.put(`${API_URL}/api/exams/${selectedExam._id}/faculty`, {
-        hall: allocatedHall,
-        faculty: facultyName
-      }, {
-        headers: { 'x-dept-name': selectedDept }
-      });
+      const res = await axios.put(
+        `${API_URL}/api/exams/${selectedExam._id}/faculty`,
+        { hall: allocatedHall, faculty: facultyName },
+        { headers: { 'x-dept-name': selectedDept } }
+      );
       setFacultyName('');
-      setShowFacultyModal(false);
-      fetchExams(); // Refresh to get the updated list
-      toast.success('Faculty assigned successfully');
-    } catch (err) {
+      setAllocatedHall(null);
+      setSelectedExam(res.data);
+      fetchExams();
+      // Faculty saved silently
+    } catch {
       toast.error('Failed to save faculty name');
     }
   };
 
-  const isAllAllocated = selectedExam && (selectedExam.allocatedHalls?.length || 0) === (selectedExam.halls?.length || 0);
+  const isAllAllocated =
+    selectedExam &&
+    (selectedExam.allocatedHalls?.length || 0) === (selectedExam.halls?.length || 0);
+
+  const dismissConfirm = () => setShowConfirm({ show: false, type: '', id: null });
 
   return (
-    <motion.div 
-      initial={{ opacity: 0, y: 20 }}
+    <motion.div
+      initial={{ opacity: 0, y: 16 }}
       animate={{ opacity: 1, y: 0 }}
       className="allocation-page-container"
     >
       <BackButton />
-      <div style={{ marginBottom: '3rem' }}>
-        <h1 className="gradient-text" style={{ fontSize: '3rem', fontWeight: 900, marginBottom: '0.5rem' }}>
+
+      {/* Page Title */}
+      <div style={{ marginBottom: 'var(--space-md)' }}>
+        <h1
+          className="gradient-text"
+          style={{ fontSize: 'var(--font-xl)', fontWeight: 900, marginBottom: '0.375rem', lineHeight: 1.1 }}
+        >
           Hall Allocation
         </h1>
-        <p style={{ color: 'var(--text-muted)', fontWeight: 600, fontSize: '1.1rem' }}>
-          Assigning seats for the <span style={{ color: 'var(--primary-theme)' }}>{selectedDept}</span> department
+        <p
+          className="mobile-hide"
+          style={{ color: 'var(--text-muted)', fontWeight: 500, fontSize: 'var(--font-base)' }}
+        >
+          Assigning halls for the{' '}
+          <strong style={{ color: 'var(--primary)', fontWeight: 800 }}>{selectedDept}</strong>{' '}
+          department
         </p>
       </div>
 
-      <div className="allocation-grid">
-        {/* Sidebar: Exam Selection */}
-        <div className="glass-panel sidebar-glass">
-          <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem', marginBottom: '0.5rem' }}>
-            <LayoutGrid size={20} color="var(--primary-theme)" />
-            <h3 style={{ fontSize: '1.25rem', fontWeight: 800 }}>Scheduled Exams</h3>
-          </div>
-          
-          <div className="exam-selection-list">
-            {(() => {
-              const pendingExams = exams.filter(exam => (exam.allocatedHalls?.length || 0) < (exam.halls?.length || 0));
-              
-              if (pendingExams.length === 0) {
+      <AnimatePresence mode="wait">
+
+        {/* ── LIST VIEW ── */}
+        {!selectedExam ? (
+          <motion.div
+            key="list"
+            initial={{ opacity: 0, x: -16 }}
+            animate={{ opacity: 1, x: 0 }}
+            exit={{ opacity: 0, x: 16 }}
+            className="exam-list-view"
+          >
+            <div className="view-header">
+              <div style={{ display: 'flex', alignItems: 'center', gap: '0.875rem' }}>
+                <div className="view-icon-box">
+                  <LayoutGrid size={22} />
+                </div>
+                <div>
+                  <h2 style={{ fontSize: '1.2rem', fontWeight: 900, color: 'var(--text)' }}>
+                    Scheduled Exams
+                  </h2>
+                  <p style={{ color: 'var(--text-muted)', fontSize: '0.82rem', fontWeight: 500, marginTop: 2 }}>
+                    Select a session to begin hall allocation
+                  </p>
+                </div>
+              </div>
+
+              {/* Real-time Search */}
+              <div style={{ position: 'relative', maxWidth: 450, width: '100%', margin: '0 auto 1.5rem 0' }}>
+                <Search
+                  size={16}
+                  style={{
+                    position: 'absolute', left: '0.875rem',
+                    top: '50%', transform: 'translateY(-50%)',
+                    color: 'var(--text-muted)', pointerEvents: 'none'
+                  }}
+                />
+                <input
+                  type="text"
+                  placeholder="Filter sessions..."
+                  className="form-input"
+                  style={{ paddingLeft: '2.75rem', height: 42, borderRadius: 'var(--r)' }}
+                  value={search}
+                  onChange={(e) => setSearch(e.target.value)}
+                />
+              </div>
+            </div>
+
+            <div className="exam-grid-container">
+              {(() => {
+                const pendingExams = exams.filter(
+                  e => (e.allocatedHalls?.length || 0) < (e.halls?.length || 0) &&
+                       e.name.toLowerCase().includes(search.toLowerCase())
+                );
+
+                if (pendingExams.length === 0) {
+                  return (
+                    <div className="empty-state-card">
+                      <AlertCircle size={52} color="var(--border-strong)" style={{ marginBottom: '1.25rem', margin: '0 auto 1.25rem' }} />
+                      <h3 style={{ fontSize: '1.2rem', fontWeight: 800, color: 'var(--primary)', marginBottom: '0.5rem' }}>
+                        Nothing Scheduled
+                      </h3>
+                      <p style={{ color: 'var(--text-muted)', maxWidth: 380, margin: '0 auto', fontSize: '0.875rem' }}>
+                        {exams.length > 0
+                          ? 'All scheduled exams have been fully allocated.'
+                          : `No upcoming exams found in the ${selectedDept} department.`}
+                      </p>
+                    </div>
+                  );
+                }
+
                 return (
-                  <div style={{ textAlign: 'center', padding: '3rem 1rem' }}>
-                    <AlertCircle size={40} color="#cbd5e1" style={{ marginBottom: '1rem' }} />
-                    <p style={{ color: 'var(--text-muted)', fontSize: '0.9rem' }}>
-                      {exams.length > 0 ? 'All scheduled exams are completed' : `No exams found in ${selectedDept}`}
-                    </p>
+                  <div className="exam-cards-grid">
+                    {pendingExams.map(exam => {
+                      const finished =
+                        (exam.allocatedHalls?.length || 0) === (exam.halls?.length || 0) &&
+                        (exam.halls?.length || 0) > 0;
+                      return (
+                        <motion.div
+                          key={exam._id}
+                          layoutId={exam._id}
+                          className="exam-card-detailed"
+                          onClick={() => { setSelectedExam(exam); setAllocatedHall(null); }}
+                        >
+                          <div className="card-top">
+                            <span
+                              className="status-badge"
+                              style={{ background: finished ? 'var(--success)' : 'var(--accent)' }}
+                            >
+                              {finished ? 'Completed' : 'Pending Allocation'}
+                            </span>
+                            <button
+                              className="btn-delete-card"
+                              onClick={e => {
+                                e.stopPropagation();
+                                setShowConfirm({ show: true, type: 'delete', id: exam._id });
+                              }}
+                            >
+                              <Trash2 size={15} />
+                            </button>
+                          </div>
+
+                          <div className="card-main">
+                            <h3>{exam.name}</h3>
+                            <div className="meta-info">
+                              <span>📅 {exam.date}</span>
+                              <span>🕒 {exam.session === 'FN' ? 'Morning' : 'Afternoon'}</span>
+                            </div>
+                          </div>
+
+                          <div className="card-footer">
+                            <div className="progress-container">
+                              <div className="progress-text">
+                                <span>Progress</span>
+                                <span>{exam.allocatedHalls?.length || 0} / {exam.halls?.length || 0}</span>
+                              </div>
+                              <div className="progress-bar-bg">
+                                <div
+                                  className="progress-bar-fill"
+                                  style={{
+                                    width: `${((exam.allocatedHalls?.length || 0) / Math.max(exam.halls?.length || 1, 1)) * 100}%`
+                                  }}
+                                />
+                              </div>
+                            </div>
+                            <div className="action-hint">
+                              Select to proceed <LayoutPanelLeft size={14} />
+                            </div>
+                          </div>
+                        </motion.div>
+                      );
+                    })}
                   </div>
                 );
-              }
+              })()}
+            </div>
+          </motion.div>
+        ) : (
 
-              return pendingExams.map((exam, idx) => {
-                const finished = (exam.allocatedHalls?.length || 0) === (exam.halls?.length || 0) && (exam.halls?.length || 0) > 0;
-                return (
-                  <motion.div
-                    key={exam._id}
-                    initial={{ opacity: 0, x: -20 }}
-                    animate={{ opacity: 1, x: 0 }}
-                    transition={{ delay: idx * 0.05 }}
-                    className={`exam-item-card ${selectedExam?._id === exam._id ? 'selected' : ''}`}
-                    onClick={() => { setSelectedExam(exam); setAllocatedHall(null); }}
-                    style={{ position: 'relative' }}
-                  >
-                    <div className="info">
-                      <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-                        <p style={{ margin: 0 }}>{exam.name}</p>
-                        {finished && <CheckCircle2 size={14} color="#16a34a" />}
-                      </div>
-                      <p style={{ fontSize: '0.8rem', opacity: 0.7 }}>{exam.date} • {exam.session}</p>
-                    </div>
-                    
-                    <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
-                      <span style={{ fontSize: '0.7rem', fontWeight: 900, background: finished ? 'rgba(22, 163, 74, 0.1)' : 'rgba(59, 130, 246, 0.1)', color: finished ? '#16a34a' : 'var(--primary-theme)', padding: '2px 8px', borderRadius: '4px' }}>
-                        {exam.allocatedHalls?.length || 0}/{exam.halls?.length || 0}
-                      </span>
-                      <button
-                        onClick={(e) => {
-                          e.stopPropagation();
-                          setShowConfirm({ show: true, type: 'delete', id: exam._id });
-                        }}
-                        className="btn-delete-small"
-                        title="Remove Record"
-                      >
-                        <Trash2 size={16} />
-                      </button>
-                    </div>
-                  </motion.div>
-                );
-              });
-            })()}
-          </div>
-        </div>
+          /* ── DETAIL VIEW ── */
+          <motion.div
+            key="detail"
+            initial={{ opacity: 0, x: 16 }}
+            animate={{ opacity: 1, x: 0 }}
+            exit={{ opacity: 0, x: -16 }}
+            className="allocation-detail-view"
+          >
+            <button className="back-to-list-btn" onClick={() => setSelectedExam(null)}>
+              <LayoutPanelLeft size={16} />
+              Back to Scheduled Exams
+            </button>
 
-        {/* Main Content: Allocation Area */}
-        <div className="glass-panel" style={{ minHeight: '600px', display: 'flex', flexDirection: 'column' }}>
-          <AnimatePresence mode="wait">
-            {selectedExam ? (
-              <motion.div 
-                key="active"
-                initial={{ opacity: 0, scale: 0.95 }}
-                animate={{ opacity: 1, scale: 1 }}
-                exit={{ opacity: 0, scale: 1.05 }}
-                className="allocation-hero"
-              >
-                <div className="progress-pill">
-                  <CheckCircle2 size={16} />
-                  <span>{selectedExam.allocatedHalls?.length || 0} of {selectedExam.halls?.length || 0} Halls Assigned</span>
+            <div className="glass-panel main-allocation-panel">
+              <div className="allocation-hero" style={{ maxWidth: 760, margin: '0 auto' }}>
+
+                {/* Exam Info */}
+                <div style={{
+                  display: 'flex', alignItems: 'center',
+                  justifyContent: 'space-between', flexWrap: 'wrap',
+                  gap: '0.75rem', marginBottom: '1.5rem'
+                }}>
+                  <div>
+                    <h2 style={{
+                      fontSize: '1.35rem', fontWeight: 900,
+                      color: 'var(--primary)', marginBottom: '0.25rem', letterSpacing: '-0.3px'
+                    }}>
+                      {selectedExam.name}
+                    </h2>
+                    <div style={{
+                      fontSize: '0.82rem', color: 'var(--text-muted)',
+                      fontWeight: 600, display: 'flex', alignItems: 'center', gap: '0.5rem'
+                    }}>
+                      <span>📅 {selectedExam.date}</span>
+                      <span style={{ opacity: 0.4 }}>|</span>
+                      <span>🕒 {selectedExam.session === 'FN' ? 'Morning (FN)' : 'Afternoon (AN)'}</span>
+                    </div>
+                  </div>
+                  <div style={{
+                    padding: '0.4rem 0.875rem',
+                    background: 'var(--bg)', borderRadius: 'var(--r-full)',
+                    border: '1px solid var(--border)',
+                    fontSize: '0.78rem', fontWeight: 800, color: 'var(--text-muted)'
+                  }}>
+                    {selectedExam.allocatedHalls?.length || 0} / {selectedExam.halls?.length || 0} halls
+                  </div>
                 </div>
-                
-                <h2 style={{ fontSize: '2.5rem', fontWeight: 900, color: 'var(--primary-theme)', marginBottom: '1rem' }}>
-                  {selectedExam.name}
-                </h2>
 
-                <div className={`result-glow-box ${allocatedHall ? 'allocated' : ''}`}>
-                  {allocatedHall ? (
-                    <motion.div
-                      initial={{ opacity: 0, scale: 0.5 }}
-                      animate={{ opacity: 1, scale: 1 }}
-                      transition={{ type: 'spring', damping: 12 }}
+                {/* Generate / Complete */}
+                <div style={{ marginBottom: '1.5rem' }}>
+                  {!isAllAllocated ? (
+                    <button
+                      onClick={handleGenerate}
+                      disabled={loading}
+                      className="btn-generate-main"
+                      style={{ width: '100%', justifyContent: 'center' }}
                     >
-                      <p style={{ fontWeight: 800, letterSpacing: '3px', color: 'var(--secondary-theme)', fontSize: '0.9rem' }}>
-                        NEWLY ALLOCATED
-                      </p>
-                      <div className="glowing-hall">{allocatedHall}</div>
-                    </motion.div>
+                      {loading
+                        ? <><span className="spin-icon" style={{ display: 'inline-block', width: 16, height: 16, border: '2px solid rgba(255,255,255,0.3)', borderTopColor: 'white', borderRadius: '50%' }} /> Allocating...</>
+                        : 'Generate Next Hall'}
+                    </button>
                   ) : (
-                    <div style={{ color: 'var(--text-muted)' }}>
-                      <Zap size={48} style={{ marginBottom: '1rem', opacity: 0.2 }} />
-                      <p style={{ fontWeight: 600 }}>Ready for Allocation</p>
-                      <p style={{ fontSize: '0.9rem', opacity: 0.7 }}>Click "GENERATE" to pick a random hall</p>
+                    <div className="complete-status-pill">
+                      <CheckCircle2 size={18} />
+                      All Halls Allocated Successfully
                     </div>
                   )}
                 </div>
 
-                <div style={{ marginBottom: '2.5rem', width: '100%' }}>
-                  <p style={{ fontSize: '0.85rem', fontWeight: 800, color: 'var(--text-muted)', marginBottom: '1.25rem', letterSpacing: '1px', textTransform: 'uppercase' }}>
-                    Allocated Halls ({selectedExam.allocatedHalls?.length || 0}/{selectedExam.halls?.length || 0})
-                  </p>
-                  <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(100px, 1fr))', gap: '1rem' }}>
-                    {selectedExam.allocatedHalls?.map((hall, i) => (
-                      <motion.div
-                        key={i}
-                        initial={{ opacity: 0, scale: 0.8 }}
-                        animate={{ opacity: 1, scale: 1 }}
-                        style={{ 
-                          padding: '1rem', 
-                          background: 'white', 
-                          border: '2px solid var(--border-muted)', 
-                          borderRadius: '16px', 
-                          textAlign: 'center', 
-                          fontWeight: 800, 
-                          color: 'var(--primary-theme)',
-                          boxShadow: '0 4px 12px rgba(0,0,0,0.03)'
-                        }}
-                      >
-                        {hall.hall || hall}
-                        {hall.faculty && (
-                          <div style={{ fontSize: '0.7rem', color: 'var(--text-muted)', fontWeight: 600, marginTop: '4px' }}>
-                            {hall.faculty}
-                          </div>
-                        )}
-                      </motion.div>
-                    ))}
-                    {(!selectedExam.allocatedHalls || selectedExam.allocatedHalls.length === 0) && (
-                      <div style={{ gridColumn: '1 / -1', padding: '2rem', textAlign: 'center', border: '2px dashed var(--border-muted)', borderRadius: '16px', color: 'var(--text-muted)', fontWeight: 600 }}>
-                        No halls assigned yet.
-                      </div>
-                    )}
+                {/* Allocated Halls List */}
+                <div>
+                  <div style={{
+                    display: 'flex', alignItems: 'center', gap: '0.5rem', marginBottom: '0.75rem'
+                  }}>
+                    <span style={{
+                      fontSize: '0.68rem', fontWeight: 800, color: 'var(--text-muted)',
+                      textTransform: 'uppercase', letterSpacing: '0.5px'
+                    }}>
+                      Allocated ({selectedExam.allocatedHalls?.length || 0})
+                    </span>
+                    <div style={{ height: 1, flex: 1, background: 'var(--border)' }} />
                   </div>
+
+                  {selectedExam.allocatedHalls?.length > 0 ? (
+                    <div style={{ display: 'flex', flexWrap: 'wrap', gap: '0.4rem' }}>
+                      {selectedExam.allocatedHalls.map((hall, i) => (
+                        <motion.div
+                          key={i}
+                          initial={{ opacity: 0, scale: 0.9 }}
+                          animate={{ opacity: 1, scale: 1 }}
+                          style={{
+                            display: 'flex', alignItems: 'center', gap: '0.4rem',
+                            background: 'var(--surface)', padding: '0.4rem 0.75rem',
+                            borderRadius: 'var(--r-sm)', border: '1.5px solid var(--border)',
+                            fontSize: '0.82rem'
+                          }}
+                        >
+                          <span style={{ fontSize: '0.62rem', fontWeight: 800, color: 'var(--text-muted)', minWidth: 14 }}>
+                            {i + 1}
+                          </span>
+                          <span style={{ fontWeight: 800, color: 'var(--primary)' }}>
+                            {(hall.hall || hall).replace(/-\d+$/, '')}
+                          </span>
+                          {hall.faculty && (
+                            <span style={{ fontSize: '0.68rem', color: 'var(--text-muted)', fontWeight: 600 }}>
+                              · {hall.faculty}
+                            </span>
+                          )}
+                        </motion.div>
+                      ))}
+                    </div>
+                  ) : (
+                    <p style={{
+                      textAlign: 'center', padding: '1.5rem 0',
+                      color: 'var(--text-muted)', fontSize: '0.82rem', fontStyle: 'italic'
+                    }}>
+                      No halls assigned yet. Click "Generate Next Hall" to begin.
+                    </p>
+                  )}
                 </div>
 
-                {isAllAllocated ? (
-                  <motion.div 
-                    initial={{ opacity: 0, y: 10 }}
-                    animate={{ opacity: 1, y: 0 }}
-                    style={{ 
-                      padding: '1.5rem 3rem', 
-                      background: 'rgba(21, 128, 61, 0.08)', 
-                      borderRadius: '100px', 
-                      color: '#16a34a', 
-                      fontWeight: 800,
-                      display: 'flex',
-                      alignItems: 'center',
-                      gap: '1rem',
-                      border: '1.5px solid rgba(22, 163, 74, 0.2)'
-                    }}
-                  >
-                    <CheckCircle2 size={24} />
-                    Session Complete: All halls assigned.
-                  </motion.div>
-                ) : (
-                  <button
-                    onClick={() => setShowConfirm({ show: true, type: 'allocate', id: null })}
-                    disabled={loading}
-                    className="btn-primary"
-                    style={{ padding: '1.25rem 4rem', fontSize: '1.2rem', width: 'auto' }}
-                  >
-                    {loading ? (
-                      <span style={{ display: 'flex', alignItems: 'center', gap: '0.8rem' }}>
-                        <Zap className="spin-icon" size={20} />
-                        ASSIGNING...
-                      </span>
-                    ) : (
-                      'GENERATE HALL'
-                    )}
-                  </button>
+                {/* All done */}
+                {isAllAllocated && !allocatedHall && (
+                  <div style={{
+                    marginTop: '1rem', padding: '0.75rem 1rem',
+                    background: 'var(--success-bg)', borderRadius: 'var(--r)',
+                    border: '1px solid var(--success-border)',
+                    display: 'flex', alignItems: 'center', gap: '0.625rem',
+                    color: 'var(--success-text)', fontSize: '0.82rem', fontWeight: 700
+                  }}>
+                    <CheckCircle2 size={16} />
+                    All halls have been successfully assigned.
+                  </div>
                 )}
-              </motion.div>
-            ) : (
-              <motion.div 
-                key="empty"
-                initial={{ opacity: 0 }}
-                animate={{ opacity: 1 }}
-                className="allocation-hero"
-                style={{ opacity: 0.7 }}
-              >
-                <div className="placeholder-icon">
-                  <LayoutPanelLeft size={48} />
-                </div>
-                <h3 style={{ fontSize: '1.75rem', fontWeight: 800, marginBottom: '0.5rem' }}>Select an Exam</h3>
-                <p style={{ maxWidth: '350px', color: 'var(--text-muted)', fontWeight: 500 }}>
-                  Choose a session from the left sidebar to begin the random hall allocation process.
-                </p>
-              </motion.div>
-            )}
-          </AnimatePresence>
-        </div>
-      </div>
-
-      {/* Modern Dialog */}
-      <AnimatePresence>
-        {showConfirm.show && (
-          <div style={{ position: 'fixed', inset: 0, zIndex: 2000 }}>
-            <motion.div 
-              initial={{ opacity: 0 }}
-              animate={{ opacity: 1 }}
-              exit={{ opacity: 0 }}
-              onClick={() => setShowConfirm({ show: false, type: '', id: null })}
-              style={{ position: 'absolute', inset: 0, background: 'rgba(15, 23, 42, 0.4)', backdropFilter: 'blur(4px)' }} 
-            />
-            <div style={{ position: 'relative', height: '100%', display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '2rem' }}>
-              <motion.div 
-                initial={{ opacity: 0, scale: 0.9, y: 20 }}
-                animate={{ opacity: 1, scale: 1, y: 0 }}
-                exit={{ opacity: 0, scale: 0.9, y: 20 }}
-                style={{ 
-                  background: 'var(--white)', 
-                  padding: '3rem', 
-                  borderRadius: '32px', 
-                  maxWidth: '480px', 
-                  width: '100%', 
-                  boxShadow: '0 40px 100px -20px rgba(0,0,0,0.3)',
-                  border: '1px solid var(--border-muted)'
-                }}
-              >
-                <div style={{ 
-                  width: '64px', 
-                  height: '64px', 
-                  borderRadius: '20px', 
-                  background: showConfirm.type === 'delete' ? 'rgba(211, 47, 47, 0.1)' : 'rgba(59, 130, 246, 0.1)',
-                  display: 'flex',
-                  alignItems: 'center',
-                  justifyContent: 'center',
-                  marginBottom: '2rem',
-                  color: showConfirm.type === 'delete' ? '#D32F2F' : 'var(--primary-theme)'
-                }}>
-                  {showConfirm.type === 'delete' ? <Trash2 size={32} /> : <Zap size={32} />}
-                </div>
-
-                <h3 style={{ fontSize: '1.75rem', fontWeight: 900, marginBottom: '1rem', color: 'var(--primary-theme)' }}>
-                  {showConfirm.type === 'delete' ? 'Delete Record?' : 'Ready to Allocate?'}
-                </h3>
-                <p style={{ color: 'var(--text-muted)', marginBottom: '3rem', lineHeight: '1.6', fontSize: '1.05rem', fontWeight: 500 }}>
-                  {showConfirm.type === 'delete' 
-                    ? 'This will permanently remove the exam and all session history. This operation is irreversible.'
-                    : 'A random hall will be selected from the available pool for this department. Proced with allocation?'
-                  }
-                </p>
-                <div style={{ display: 'flex', gap: '1rem' }}>
-                  <button 
-                    onClick={() => setShowConfirm({ show: false, type: '', id: null })} 
-                    style={{ flex: 1, padding: '1.2rem', background: 'var(--background-site)', border: 'none', borderRadius: '16px', cursor: 'pointer', fontWeight: 700, color: 'var(--text-main)' }}
-                  >
-                    Go Back
-                  </button>
-                  <button 
-                    onClick={() => {
-                      if (showConfirm.type === 'delete') handleDelete(showConfirm.id);
-                      else handleGenerate();
-                      setShowConfirm({ show: false, type: '', id: null });
-                    }} 
-                    className="btn-primary" 
-                    style={{ flex: 1.5, margin: 0, background: showConfirm.type === 'delete' ? '#ef4444' : 'var(--primary-theme)' }}
-                  >
-                    {showConfirm.type === 'delete' ? 'Yes, Delete' : 'Confirm Allocation'}
-                  </button>
-                </div>
-              </motion.div>
+              </div>
             </div>
-          </div>
+          </motion.div>
         )}
       </AnimatePresence>
-      
-      {/* Faculty Name Modal */}
+
+      {/* ── FACULTY MODAL ── */}
       <AnimatePresence>
-        {showFacultyModal && (
-          <div style={{ position: 'fixed', inset: 0, zIndex: 3000 }}>
-            <motion.div 
+        {allocatedHall && (
+          <div style={{
+            position: 'fixed', inset: 0, zIndex: 3000,
+            display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '1rem'
+          }}>
+            <motion.div
               initial={{ opacity: 0 }}
               animate={{ opacity: 1 }}
               exit={{ opacity: 0 }}
-              style={{ position: 'absolute', inset: 0, background: 'rgba(15, 23, 42, 0.6)', backdropFilter: 'blur(8px)' }} 
+              style={{ position: 'absolute', inset: 0, background: 'rgba(15,23,42,0.7)', backdropFilter: 'blur(12px)' }}
             />
-            <div style={{ position: 'relative', height: '100%', display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '2rem' }}>
-              <motion.div 
-                initial={{ opacity: 0, scale: 0.9, y: 20 }}
-                animate={{ opacity: 1, scale: 1, y: 0 }}
-                exit={{ opacity: 0, scale: 0.9, y: 20 }}
-                style={{ 
-                  background: 'var(--white)', 
-                  padding: '3rem', 
-                  borderRadius: '32px', 
-                  maxWidth: '480px', 
-                  width: '100%', 
-                  boxShadow: '0 50px 100px -20px rgba(0,0,0,0.4)',
-                  border: '1px solid var(--border-muted)',
-                  textAlign: 'center'
-                }}
-              >
-                <div style={{ 
-                  width: '64px', 
-                  height: '64px', 
-                  borderRadius: '20px', 
-                  background: 'rgba(59, 130, 246, 0.1)',
-                  display: 'flex',
-                  alignItems: 'center',
-                  justifyContent: 'center',
-                  margin: '0 auto 2rem',
-                  color: 'var(--primary-theme)'
+            <motion.div
+              initial={{ opacity: 0, scale: 0.92, y: 24 }}
+              animate={{ opacity: 1, scale: 1, y: 0 }}
+              exit={{ opacity: 0, scale: 0.92, y: 24 }}
+              transition={{ type: 'spring', damping: 26, stiffness: 300 }}
+              className="allocation-modal"
+              style={{
+                position: 'relative',
+                background: 'white',
+                padding: '2.25rem 2rem',
+                borderRadius: 'var(--r-xl)',
+                maxWidth: 380, width: '100%',
+                boxShadow: 'var(--shadow-xl)',
+                textAlign: 'center'
+              }}
+            >
+              {/* Success Icon */}
+              <div style={{
+                width: 52, height: 52, borderRadius: '50%',
+                background: 'linear-gradient(135deg, #10b981, #059669)',
+                display: 'flex', alignItems: 'center', justifyContent: 'center',
+                margin: '0 auto 1rem',
+                boxShadow: '0 8px 20px rgba(16,185,129,0.28)'
+              }}>
+                <CheckCircle2 size={26} color="white" />
+              </div>
+
+              <p style={{
+                fontSize: '0.68rem', fontWeight: 800, color: '#10b981',
+                letterSpacing: '2px', textTransform: 'uppercase', marginBottom: '0.25rem'
+              }}>
+                Hall Assigned
+              </p>
+
+              <h3 style={{
+                fontSize: 'clamp(2.5rem, 8vw, 3.75rem)',
+                fontWeight: 900, color: 'var(--primary)',
+                margin: '0.25rem 0 1.5rem', lineHeight: 1,
+                letterSpacing: '-2px'
+              }}>
+                {allocatedHall.replace(/-\d+$/, '')}
+              </h3>
+
+              {/* Faculty Input */}
+              <div style={{ maxWidth: 320, margin: '0 auto', textAlign: 'left' }}>
+                <label style={{
+                  display: 'block', fontSize: '0.72rem', fontWeight: 700,
+                  color: 'var(--text-muted)', marginBottom: '0.5rem',
+                  textTransform: 'uppercase', letterSpacing: '0.5px'
                 }}>
-                  <Zap size={32} />
-                </div>
-
-                <h3 style={{ fontSize: '1.75rem', fontWeight: 900, marginBottom: '0.5rem', color: 'var(--primary-theme)' }}>
-                  Hall {allocatedHall} Assigned!
-                </h3>
-                <p style={{ color: 'var(--text-muted)', marginBottom: '2rem', fontWeight: 500 }}>
-                  Enter the faculty name for this hall (optional).
-                </p>
-
-                <input 
+                  Assign Faculty
+                </label>
+                <input
                   type="text"
-                  placeholder="Faculty Name (Alphanumeric)"
+                  placeholder="Enter faculty name"
                   value={facultyName}
-                  onChange={(e) => setFacultyName(e.target.value)}
-                  autoFocus
-                  style={{ 
-                    width: '100%', 
-                    padding: '1.25rem', 
-                    borderRadius: '16px', 
-                    border: '2px solid var(--border-muted)', 
-                    background: 'var(--background-site)',
-                    fontSize: '1.1rem',
-                    fontWeight: 600,
-                    marginBottom: '2rem',
-                    outline: 'none',
-                    transition: 'all 0.3s'
-                  }}
+                  onChange={e => setFacultyName(e.target.value)}
+                  onKeyDown={e => e.key === 'Enter' && handleSaveFaculty()}
+                  className="form-input"
+                  style={{ marginBottom: '0.875rem' }}
                 />
-
-                <div style={{ display: 'flex', gap: '1rem' }}>
-                  <button 
-                    onClick={() => { setShowFacultyModal(false); setFacultyName(''); }} 
-                    style={{ flex: 1, padding: '1.2rem', background: 'var(--background-site)', border: 'none', borderRadius: '16px', cursor: 'pointer', fontWeight: 700, color: 'var(--text-main)' }}
-                  >
-                    Skip
-                  </button>
-                  <button 
-                    onClick={handleSaveFaculty} 
-                    className="btn-primary" 
-                    style={{ flex: 1.5, margin: 0 }}
-                  >
-                    Confirm & Save
-                  </button>
-                </div>
-              </motion.div>
-            </div>
+                <button
+                  onClick={handleSaveFaculty}
+                  className="btn-primary"
+                  style={{ margin: 0, width: '100%' }}
+                >
+                  Confirm
+                </button>
+              </div>
+            </motion.div>
           </div>
         )}
       </AnimatePresence>
 
-      <style>{`
-        .spin-icon {
-          animation: spin 1s linear infinite;
-        }
-        @keyframes spin {
-          from { transform: rotate(0deg); }
-          to { transform: rotate(360deg); }
-        }
-      `}</style>
+      {/* ── DELETE CONFIRM ── */}
+      <AnimatePresence>
+        {showConfirm.show && showConfirm.type === 'delete' && (
+          <div style={{
+            position: 'fixed', inset: 0, zIndex: 2000,
+            display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '1rem'
+          }}>
+            <motion.div
+              initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}
+              onClick={dismissConfirm}
+              style={{ position: 'absolute', inset: 0, background: 'rgba(15,23,42,0.55)', backdropFilter: 'blur(6px)' }}
+            />
+            <motion.div
+              initial={{ opacity: 0, scale: 0.92, y: 16 }}
+              animate={{ opacity: 1, scale: 1, y: 0 }}
+              exit={{ opacity: 0, scale: 0.92, y: 16 }}
+              transition={{ type: 'spring', damping: 26, stiffness: 300 }}
+              style={{
+                position: 'relative', background: 'white',
+                padding: '2rem 1.75rem', borderRadius: 'var(--r-xl)',
+                maxWidth: 360, width: '100%',
+                boxShadow: 'var(--shadow-xl)', textAlign: 'center'
+              }}
+            >
+              <div style={{
+                width: 48, height: 48, borderRadius: '50%',
+                background: 'var(--danger-bg)',
+                display: 'flex', alignItems: 'center', justifyContent: 'center',
+                margin: '0 auto 1rem', color: 'var(--danger)'
+              }}>
+                <Trash2 size={22} />
+              </div>
+              <h3 style={{ fontSize: '1.1rem', fontWeight: 900, marginBottom: '0.5rem', color: 'var(--text)' }}>
+                Delete this exam?
+              </h3>
+              <p style={{ color: 'var(--text-muted)', marginBottom: '1.5rem', fontSize: '0.85rem', lineHeight: 1.6 }}>
+                This action cannot be undone.
+              </p>
+              <div style={{ display: 'flex', gap: '0.75rem' }}>
+                <button
+                  onClick={dismissConfirm}
+                  style={{
+                    flex: 1, padding: '0.8rem',
+                    background: 'var(--bg)', border: '1.5px solid var(--border)',
+                    borderRadius: 'var(--r)', cursor: 'pointer',
+                    fontWeight: 700, color: 'var(--text-secondary)',
+                    fontSize: '0.875rem', fontFamily: 'inherit'
+                  }}
+                >
+                  Cancel
+                </button>
+                <button
+                  onClick={() => {
+                    handleDelete(showConfirm.id);
+                    dismissConfirm();
+                  }}
+                  style={{
+                    flex: 1, padding: '0.8rem',
+                    background: 'var(--danger)', color: 'white',
+                    border: 'none', borderRadius: 'var(--r)',
+                    cursor: 'pointer', fontWeight: 700,
+                    fontSize: '0.875rem',
+                    boxShadow: '0 4px 12px rgba(220,38,38,0.25)',
+                    fontFamily: 'inherit'
+                  }}
+                >
+                  Delete
+                </button>
+              </div>
+            </motion.div>
+          </div>
+        )}
+      </AnimatePresence>
     </motion.div>
   );
 };

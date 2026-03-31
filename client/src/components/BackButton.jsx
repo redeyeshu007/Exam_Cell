@@ -11,7 +11,7 @@ const BackButton = ({ to = "/" }) => {
       title="Go Back"
     >
       <ArrowLeft size={20} />
-      <span>Back to Hub</span>
+      <span className="hide-mobile">Back to Hub</span>
     </button>
   );
 };

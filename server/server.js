@@ -65,11 +65,21 @@ const getModel = (req) => {
   return getExamModel(dept.toUpperCase());
 };
 
-app.get('/', (req, res) => {
+app.get('/', async (req, res) => {
   const dbStatus = mongoose.connection.readyState === 1 ? '✅ Connected' : '❌ Disconnected';
+  let userCount = 0;
+  try {
+    if (mongoose.connection.readyState === 1) {
+      userCount = await User.countDocuments();
+    }
+  } catch (err) {
+    console.error('Error counting users:', err);
+  }
+
   res.send(`
     <h1>Exam Cell API Server is Running</h1>
     <p>Database Status: <b>${dbStatus}</b></p>
+    <p>Registered Users: <b>${userCount}</b></p>
     <hr>
     <p><i>Tip for Render deployment: Make sure you have set the <b>MONGO_URI</b> environment variable in your Render dashboard.</i></p>
   `);

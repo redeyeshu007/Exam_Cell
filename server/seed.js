@@ -3,18 +3,29 @@ require('dotenv').config();
 const Hall = require('./models/Hall');
 
 const halls = [
-  { hallName: 'Hall 1', capacity: 30 },
-  { hallName: 'Hall 2', capacity: 30 },
-  { hallName: 'Hall 3', capacity: 30 },
-  { hallName: 'Hall 4', capacity: 30 },
-  { hallName: 'Hall 5', capacity: 30 },
-  { hallName: 'Hall 6', capacity: 30 },
-  { hallName: 'Hall 7', capacity: 30 },
-  { hallName: 'Hall 8', capacity: 30 },
-  { hallName: 'Hall 9', capacity: 30 },
-  { hallName: 'Hall 10', capacity: 30 },
-  { hallName: 'Hall 11', capacity: 30 },
-  { hallName: 'Hall 12', capacity: 30 },
+  { hallName: 'CS104', capacity: 40, block: 'CSE Block' },
+  { hallName: 'CS105', capacity: 40, block: 'CSE Block' },
+  { hallName: 'CS201', capacity: 40, block: 'CSE Block' },
+  { hallName: 'CS202', capacity: 40, block: 'CSE Block' },
+  { hallName: 'CS205', capacity: 40, block: 'CSE Block' },
+  { hallName: 'CS206', capacity: 40, block: 'CSE Block' },
+  { hallName: 'CS208', capacity: 40, block: 'CSE Block' },
+  { hallName: 'CS209', capacity: 40, block: 'CSE Block' },
+  { hallName: 'CS210', capacity: 40, block: 'CSE Block' },
+  { hallName: 'CS211', capacity: 40, block: 'CSE Block' },
+  { hallName: 'CS301', capacity: 40, block: 'CSE Block' },
+  { hallName: 'CS302', capacity: 40, block: 'CSE Block' },
+  { hallName: 'CS305', capacity: 40, block: 'CSE Block' },
+  { hallName: 'CS306', capacity: 40, block: 'CSE Block' },
+  { hallName: 'CS308', capacity: 40, block: 'CSE Block' },
+  { hallName: 'CS309', capacity: 40, block: 'CSE Block' },
+  { hallName: 'CS310', capacity: 40, block: 'CSE Block' },
+  { hallName: 'CS311', capacity: 40, block: 'CSE Block' },
+  { hallName: 'CS313', capacity: 40, block: 'CSE Block' },
+  { hallName: 'CS314', capacity: 40, block: 'CSE Block' },
+  { hallName: 'GFLAB', capacity: 40, block: 'Lab Complex' },
+  { hallName: 'FFLAB', capacity: 40, block: 'Lab Complex' },
+  { hallName: 'SFLAB', capacity: 40, block: 'Lab Complex' }
 ];
 
 const seedDB = async () => {

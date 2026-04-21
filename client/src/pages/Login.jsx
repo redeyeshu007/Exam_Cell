@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import { useAuth } from '../context/AuthContext';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate, Link } from 'react-router-dom';
 import toast from 'react-hot-toast';
 import { User, Lock, LogIn } from 'lucide-react';
 
@@ -73,7 +73,7 @@ const Login = () => {
         {/* Form */}
         <form onSubmit={handleSubmit} style={{ marginTop: '2rem' }}>
           <div className="form-group">
-            <label htmlFor="login-username">Username</label>
+            <label htmlFor="login-username">Email Address</label>
             <div className="form-input-wrapper">
               <User
                 size={16}
@@ -81,20 +81,31 @@ const Login = () => {
               />
               <input
                 id="login-username"
-                type="text"
+                type="email"
                 className="form-input"
                 style={{ paddingLeft: '2.75rem' }}
-                placeholder="Enter admin username"
+                placeholder="Enter admin email"
                 value={username}
                 onChange={(e) => setUsername(e.target.value)}
-                autoComplete="username"
+                autoComplete="email"
                 required
               />
             </div>
           </div>
 
           <div className="form-group">
-            <label htmlFor="login-password">Password</label>
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '0.5rem' }}>
+              <label htmlFor="login-password" style={{ marginBottom: 0 }}>Password</label>
+              <Link to="/forgot-password" style={{
+                fontSize: 'var(--font-xs)',
+                color: 'var(--primary)',
+                textDecoration: 'none',
+                fontWeight: 600
+              }} onMouseEnter={(e) => e.target.style.textDecoration = 'underline'}
+                 onMouseLeave={(e) => e.target.style.textDecoration = 'none'}>
+                Forgot Password?
+              </Link>
+            </div>
             <div className="form-input-wrapper">
               <Lock
                 size={16}

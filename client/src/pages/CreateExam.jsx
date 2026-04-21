@@ -8,6 +8,11 @@ import BackButton from '../components/BackButton';
 import API_URL from '../api';
 
 const SPECIAL_LABS = ['GFLAB', 'FFLAB', 'SFLAB'];
+const HALL_ORDER = [
+  'CS104', 'CS105', 'CS201', 'CS202', 'CS205', 'CS206', 'CS208', 'CS209', 'CS210', 'CS211',
+  'CS301', 'CS302', 'CS305', 'CS306', 'CS308', 'CS309', 'CS310', 'CS311', 'CS313', 'CS314',
+  'GFLAB', 'FFLAB', 'SFLAB'
+];
 
 const CreateExam = () => {
   const { selectedDept } = useDept();
@@ -42,7 +47,17 @@ const CreateExam = () => {
 
   useEffect(() => {
     axios.get(`${API_URL}/api/halls`)
-      .then(res => setAvailableHalls(res.data))
+      .then(res => {
+        const sortedHalls = res.data.sort((a, b) => {
+          const indexA = HALL_ORDER.indexOf(a.hallName);
+          const indexB = HALL_ORDER.indexOf(b.hallName);
+          if (indexA === -1 && indexB === -1) return a.hallName.localeCompare(b.hallName);
+          if (indexA === -1) return 1;
+          if (indexB === -1) return -1;
+          return indexA - indexB;
+        });
+        setAvailableHalls(sortedHalls);
+      })
       .catch(() => toast.error('Failed to load halls'));
 
     if (editId) {

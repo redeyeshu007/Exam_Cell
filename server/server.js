@@ -4,6 +4,8 @@ const cors = require('cors');
 const helmet = require('helmet');
 const bcrypt = require('bcryptjs');
 const jwt = require('jsonwebtoken');
+const nodemailer = require('nodemailer');
+const crypto = require('crypto');
 require('dotenv').config();
 
 const { getExamModel } = require('./models/Exam');
@@ -123,6 +125,90 @@ app.post('/api/auth/login', async (req, res) => {
   } catch (err) {
     console.error('[AUTH ERROR] /api/auth/login:', err);
     res.status(500).json({ message: 'Server error' });
+  }
+});
+
+app.post('/api/auth/forgot-password', async (req, res) => {
+  try {
+    const { email } = req.body;
+    const user = await User.findOne({ username: email });
+    if (!user) {
+      return res.status(404).json({ message: 'User not found' });
+    }
+
+    // Generate a 6-digit numeric OTP
+    const otp = Math.floor(100000 + Math.random() * 900000).toString();
+    user.otp = otp;
+    user.otpExpires = Date.now() + 600000; // 10 minutes
+    await user.save();
+
+    const transporter = nodemailer.createTransport({
+      service: 'gmail',
+      auth: {
+        user: process.env.EMAIL_USER,
+        pass: process.env.EMAIL_PASS
+      }
+    });
+
+    const mailOptions = {
+      to: user.username,
+      from: process.env.EMAIL_USER,
+      subject: 'ExamCell Portal - Password Reset OTP',
+      text: `Your One-Time Password (OTP) for resetting your password is:\n\n` +
+            `${otp}\n\n` +
+            `This code is valid for 10 minutes. If you did not request this, please ignore this email.\n`
+    };
+
+    await transporter.sendMail(mailOptions);
+    res.json({ message: 'OTP sent successfully to your email' });
+  } catch (err) {
+    console.error('[FORGOT PASSWORD ERROR]:', err);
+    res.status(500).json({ message: 'Error sending OTP' });
+  }
+});
+
+app.post('/api/auth/verify-otp', async (req, res) => {
+  try {
+    const { email, otp } = req.body;
+    const user = await User.findOne({ 
+      username: email,
+      otp,
+      otpExpires: { $gt: Date.now() }
+    });
+
+    if (!user) {
+      return res.status(400).json({ message: 'Invalid or expired OTP' });
+    }
+
+    res.json({ message: 'OTP verified successfully' });
+  } catch (err) {
+    console.error('[VERIFY OTP ERROR]:', err);
+    res.status(500).json({ message: 'Error verifying OTP' });
+  }
+});
+
+app.post('/api/auth/reset-password', async (req, res) => {
+  try {
+    const { email, otp, password } = req.body;
+    const user = await User.findOne({
+      username: email,
+      otp,
+      otpExpires: { $gt: Date.now() }
+    });
+
+    if (!user) {
+      return res.status(400).json({ message: 'Invalid or expired OTP' });
+    }
+
+    user.password = await bcrypt.hash(password, 10);
+    user.otp = undefined;
+    user.otpExpires = undefined;
+    await user.save();
+
+    res.json({ message: 'Password has been updated successfully' });
+  } catch (err) {
+    console.error('[RESET PASSWORD ERROR]:', err);
+    res.status(500).json({ message: 'Error resetting password' });
   }
 });
 
@@ -279,16 +365,22 @@ app.get('/api/stats', async (req, res) => {
 const ensureAdminUser = async () => {
   if (mongoose.connection.readyState !== 1) return;
   try {
-    const adminPassword = process.env.ADMIN_PASSWORD || 'psna123';
+    const adminEmail = process.env.EMAIL_USER || 'cseexamcell2023@gmail.com';
+    const adminPassword = process.env.ADMIN_PASSWORD || 'PSNA@C$E2023ExamCELL';
     const hashedPassword = await bcrypt.hash(adminPassword, 10);
-    const admin = await User.findOne({ username: 'admin' });
+    
+    // Create/Update the user with the provided email as username
+    const admin = await User.findOne({ username: adminEmail });
     if (admin) {
       admin.password = hashedPassword;
       await admin.save();
-      console.log('✅ Admin user password synced');
+      console.log('✅ Admin user credentials synced');
     } else {
-      await User.create({ username: 'admin', password: hashedPassword, role: 'admin' });
+      await User.create({ username: adminEmail, password: hashedPassword, role: 'admin' });
       console.log('✅ Admin user created');
+      
+      // Cleanup old default 'admin' user if it exists
+      await User.deleteOne({ username: 'admin' });
     }
   } catch (err) {
     console.error('❌ Admin seed error:', err.message);

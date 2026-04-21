@@ -10,6 +10,9 @@ import Dashboard from './pages/Dashboard';
 import CreateExam from './pages/CreateExam';
 import JoinExam from './pages/JoinExam';
 import History from './pages/History';
+import ForgotPassword from './pages/ForgotPassword';
+import VerifyOTP from './pages/VerifyOTP';
+import ResetPassword from './pages/ResetPassword';
 import Header from './components/Header';
 import Footer from './components/Footer';
 
@@ -102,6 +105,9 @@ function App() {
                 <Layout><History /></Layout>
               </ProtectedRoute>
             } />
+            <Route path="/forgot-password" element={<ForgotPassword />} />
+            <Route path="/verify-otp" element={<VerifyOTP />} />
+            <Route path="/reset-password" element={<ResetPassword />} />
             <Route path="*" element={<Navigate to="/404" />} />
             <Route path="/404" element={<NotFound />} />
           </Routes>

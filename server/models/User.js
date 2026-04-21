@@ -14,7 +14,9 @@ const userSchema = new mongoose.Schema({
   role: {
     type: String,
     default: 'admin'
-  }
+  },
+  otp: String,
+  otpExpires: Date
 }, { timestamps: true });
 
 module.exports = mongoose.model('User', userSchema);
